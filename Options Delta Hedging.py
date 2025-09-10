@@ -260,7 +260,7 @@ st.sidebar.subheader("Hedging")
 hedge_freq_days = st.sidebar.selectbox("Rebalance every (days)", [1, 5, 21], index=0, format_func=lambda x: f"Every {x} day(s)")
 
 st.sidebar.subheader("Stochastic scenario")
-N = st.sidebar.number_input("Trading days per year (N)", min_value=10, value=252, step=1)
+N = st.sidebar.number_input("Trading days per year (N)", min_value=1, value=252, step=1)
 
 use_jumps = st.sidebar.checkbox("Use Merton jump-diffusion", value=False)
 if use_jumps:
