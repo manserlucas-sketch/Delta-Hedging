@@ -111,10 +111,6 @@ def delta_hedge_table_and_pnl(path, option_type, side, K, T, r, sigma, n_contrac
     days = np.arange(0, N+1)
     stock_price = path.copy()
     delta_unit = np.zeros(N+1)
-    gamma_unit = np.zeros(N+1)
-    vega_unit = np.zeros(N+1)
-    theta_unit = np.zeros(N+1)
-    rho_unit = np.zeros(N+1)
     shares_in_portfolio = np.zeros(N+1)
     shares_purchased = np.zeros(N+1)
     cost_shares = np.zeros(N+1)
@@ -185,12 +181,7 @@ def delta_hedge_table_and_pnl(path, option_type, side, K, T, r, sigma, n_contrac
     df = pd.DataFrame({
         "Day": days,
         "Stock Price": np.round(stock_price, 6),
-        "Tau (yrs)": np.round((N - days)/N, 6),
         "Delta (per unit)": np.round(delta_unit, 6),
-        "Gamma (per unit)": np.round(gamma_unit, 8),
-        "Vega (per unit)": np.round(vega_unit, 6),
-        "Theta (per yr per unit)": np.round(theta_unit, 6),
-        "Rho (per unit)": np.round(rho_unit, 6),
         "Shares in Portfolio": np.round(shares_in_portfolio, 6),
         "Shares Purchased (today)": np.round(shares_purchased, 6),
         "Cost of Shares Purchase": np.round(cost_shares, 6),
@@ -212,7 +203,6 @@ def delta_hedge_table_and_pnl(path, option_type, side, K, T, r, sigma, n_contrac
 # Streamlit UI
 # ----------------------------
 st.title("Greeks & Delta Hedging Simulator (per-scenario, S0 naming)")
-st.markdown("Simulates each scenario independently. Time to maturity per day uses `tau = (N - day) / N`.")
 
 # Sidebar inputs
 st.sidebar.header("Market & Option Parameters")
