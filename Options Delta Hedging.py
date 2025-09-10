@@ -423,4 +423,33 @@ for opt_type, side in cases:
             df_up, info_up = all_results[(opt_type, side, "up")]
             st.dataframe(df_up)  # wide; user can scroll
             st.markdown(f"**Summary Up:** premium per unit = ${info_up['premium_per_unit']:.6f}, "
-                        f"total premium = ${info_u_
+                        f"total premium = ${info_up['premium_per_unit']:.6f}, "
+                        f"total premium = ${info_up['total_premium']:.2f}, final portfolio = ${info_up['final_portfolio_value']:.2f}")
+        with c2:
+            st.subheader("Down scenario (ST < K)")
+            df_down, info_down = all_results[(opt_type, side, "down")]
+            st.dataframe(df_down)
+            st.markdown(f"**Summary Down:** premium per unit = ${info_down['premium_per_unit']:.6f}, "
+                        f"total premium = ${info_down['total_premium']:.2f}, final portfolio = ${info_down['final_portfolio_value']:.2f}")
+
+# ----------------------------
+# 10. Final metrics & notes
+# ----------------------------
+st.header("Key metrics and notes")
+col1, col2, col3, col4 = st.columns(4)
+val_up = info_up_sel['final_portfolio_value']
+val_down = info_down_sel['final_portfolio_value']
+col1.metric("Final Portfolio (Up)", f"${val_up:.2f}")
+col2.metric("Final Portfolio (Down)", f"${val_down:.2f}")
+col3.metric("Premium Paid per unit", f"${info_up_sel['premium_per_unit']:.4f}")
+col4.metric("Total Premium (all contracts)", f"${info_up_sel['total_premium']:.2f}")
+
+st.markdown("""
+**Notes & assumptions**
+- Option prices and Greeks are computed using Black–Scholes (constant σ) per day (for mark-to-market).
+- Option premium is included at t=0 in the cash account (long pays, short receives).
+- Hedging frequency determines when rebalancing occurs: every X trading days (user choice).
+- Transaction cost is a flat $ per share and applied to each trade (abs(shares_traded) * cost_per_share).
+- Jump-diffusion (Merton) option: if enabled, jumps are simulated in the underlying; Black–Scholes is still used for daily marking (this is common in simple stress tests but inconsistent for full repricing under jumps).
+- The DataFrames show day-by-day accounting: stock price, per-unit delta, hedge shares (aggregate), trades, costs, cumulative cash outflow and portfolio values.
+""")
