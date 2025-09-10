@@ -130,4 +130,125 @@ def delta_hedge_table_and_pnl(path, option_type, side, K, N, r, sigma, n_contrac
         "Tau (yrs)": (N-days)/N,
         "Delta (per unit)": delta_unit,
         "Gamma (per unit)": gamma_unit,
-        "V
+        "Vega (per unit)": vega_unit,
+        "Theta (per yr per unit)": theta_unit,
+        "Rho (per unit)": rho_unit,
+        "Shares in Portfolio": shares_in_portfolio,
+        "Shares Purchased (today)": shares_purchased,
+        "Cost of Shares Purchase": cost_shares,
+        "Transaction Cost": tx_costs,
+        "Cumulative Cash Outflow": cumulative_cash_outflow
+    }).set_index("Day")
+
+    info = {
+        "premium_per_unit": premium_per_unit,
+        "total_premium": total_premium,
+        "payoff_per_unit": payoff_per_unit,
+        "payoff_total_signed": payoff_total,
+        "pnl_by_formula": pnl
+    }
+
+    return df, info
+
+# ----------------------------
+# Streamlit UI
+# ----------------------------
+st.title("Greeks & Delta Hedging Simulator v3")
+st.sidebar.header("Market & Option Parameters")
+
+S0 = st.sidebar.number_input("Spot Price S0", value=100.0)
+K = st.sidebar.number_input("Strike Price K", value=100.0)
+T = st.sidebar.number_input("Time to Expiration (Years)", value=1.0)
+r = st.sidebar.number_input("Risk-free Rate (%)", value=0.0)/100.0
+sigma = st.sidebar.number_input("Volatility σ (%)", value=20.0)/100.0
+mu = st.sidebar.number_input("Expected Return μ (%)", value=0.0)/100.0
+
+st.sidebar.subheader("Contracts & Costs")
+n_contracts = st.sidebar.number_input("Number of Option Contracts", 1, 1000, 10)
+contract_size = st.sidebar.number_input("Contract Size", 1, 1000, 100)
+txn_cost_per_share = st.sidebar.number_input("Transaction cost per share ($)", 0.0, 10.0, 0.0)
+
+st.sidebar.subheader("Hedging")
+hedge_freq_days = st.sidebar.selectbox("Rebalance every (days)", [1,5,21], index=0)
+
+st.sidebar.subheader("Stochastic scenario")
+N = st.sidebar.number_input("Trading days per year (N)", 10, 500, 252)
+
+use_jumps = st.sidebar.checkbox("Use Merton jump-diffusion", value=False)
+if use_jumps:
+    lam = st.sidebar.number_input("Jump intensity λ", 0.0, 5.0, 0.5)
+    mu_j = st.sidebar.number_input("Jump log-mean μ_J", -1.0, 1.0, -0.05)
+    sigma_j = st.sidebar.number_input("Jump log-stdev σ_J", 0.0, 1.0, 0.1)
+else:
+    lam = mu_j = sigma_j = 0.0
+
+seed = st.sidebar.number_input("Random seed (0=random)", 0)
+seed_use = None if seed==0 else int(seed)
+
+# ----------------------------
+# Compute results for 4 independent cases
+# ----------------------------
+cases = [("Call","Long"),("Call","Short"),("Put","Long"),("Put","Short")]
+results = {}
+
+with st.spinner("Simulating scenarios..."):
+    for opt, side in cases:
+        path_up, path_down = gen_two_paths_until_one_above_below(S0, mu, sigma, T, N, use_jumps, lam, mu_j, sigma_j, K, seed_use)
+        df_up, info_up = delta_hedge_table_and_pnl(path_up, opt, side, K, N, r, sigma, n_contracts, contract_size, hedge_freq_days, txn_cost_per_share)
+        df_down, info_down = delta_hedge_table_and_pnl(path_down, opt, side, K, N, r, sigma, n_contracts, contract_size, hedge_freq_days, txn_cost_per_share)
+        results[(opt,side)] = {"path_up": path_up, "path_down": path_down,
+                               "df_up": df_up, "df_down": df_down,
+                               "info_up": info_up, "info_down": info_down}
+
+st.success("Simulations complete.")
+
+# ----------------------------
+# Display sample compact plot for a selected case
+# ----------------------------
+sel_opt = st.selectbox("Select Option Type", ["Call","Put"])
+sel_side = st.selectbox("Select Side", ["Long","Short"])
+res = results[(sel_opt, sel_side)]
+time = np.linspace(0, T, N+1)
+
+fig, axes = plt.subplots(3,1,figsize=(14,10), constrained_layout=True)
+axes[0].plot(time, res['path_up'], label=f'Path Up (ST={res["path_up"][-1]:.2f})')
+axes[0].plot(time, res['path_down'], label=f'Path Down (ST={res["path_down"][-1]:.2f})', linestyle='--')
+axes[0].axhline(K,color='gray',linestyle=':')
+axes[0].set_title("Stock Price Paths"); axes[0].legend(fontsize='small'); axes[0].grid(True)
+
+axes[1].plot(time, res['df_up']["Cumulative Cash Outflow"], label='Cumulative Outflow Up')
+axes[1].plot(time, res['df_down']["Cumulative Cash Outflow"], label='Cumulative Outflow Down', linestyle='--')
+axes[1].set_title("Cumulative Cash Outflow"); axes[1].legend(fontsize='small'); axes[1].grid(True)
+
+# Delta
+axes[2].plot(time, res['df_up']["Delta (per unit)"], label='Delta Up')
+axes[2].plot(time, res['df_down']["Delta (per unit)"], label='Delta Down', linestyle='--')
+axes[2].set_title("Delta over Time"); axes[2].legend(fontsize='small'); axes[2].grid(True)
+
+st.pyplot(fig)
+
+# ----------------------------
+# Detailed daily boards
+# ----------------------------
+st.header("Detailed Daily Boards")
+for opt, side in cases:
+    with st.expander(f"{opt} - {side}"):
+        res = results[(opt,side)]
+        col1,col2 = st.columns(2)
+        with col1:
+            st.subheader("Up scenario")
+            st.dataframe(res['df_up'], height=300)
+            st.markdown(f"- Premium/unit: ${res['info_up']['premium_per_unit']:.4f}")
+            st.markdown(f"- Total PnL: ${res['info_up']['pnl_by_formula']:.2f}")
+        with col2:
+            st.subheader("Down scenario")
+            st.dataframe(res['df_down'], height=300)
+            st.markdown(f"- Premium/unit: ${res['info_down']['premium_per_unit']:.4f}")
+            st.markdown(f"- Total PnL: ${res['info_down']['pnl_by_formula']:.2f}")
+
+# ----------------------------
+# Greeks descriptions
+# ----------------------------
+st.markdown("**Greeks (general explanations):**")
+for k,v in GREEK_DESCRIPTIONS.items():
+    st.write(f"**{k}** — {v}")
