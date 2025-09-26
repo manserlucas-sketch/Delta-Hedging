@@ -2,4 +2,4 @@ streamlit
 matplotlib
 numpy
 scipy
-panda
+pandas
